@@ -22,7 +22,7 @@ export class ServerEnv extends Context.Service<
 
       const DatabaseUrl = yield* Config.redacted("DATABASE_URL").pipe(Effect.orDie);
 
-      const PgPort = yield* Config.schema(Schema.Redacted(Schema.Number), "PG_PORT").pipe(
+      const PgPort = yield* Config.schema(Schema.Redacted(Schema.Number), "PGPORT").pipe(
         Effect.orDie,
       );
 
@@ -36,7 +36,7 @@ export class ServerEnv extends Context.Service<
   );
 }
 
-const EnvironmentLive = ConfigProvider.layerAdd(
+export const EnvironmentLive = ConfigProvider.layerAdd(
   ConfigProvider.fromDotEnv({
     path: ".env.local",
     expandVariables: true,
