@@ -16,10 +16,5 @@
   "routerOnly": false,
   "version": 1,
   "framework": "react",
-  "chosenAddOns": [
-    "railway",
-    "shadcn",
-    "drizzle",
-    "better-auth"
-  ]
+  "chosenAddOns": ["railway", "shadcn", "drizzle", "better-auth"]
 }
