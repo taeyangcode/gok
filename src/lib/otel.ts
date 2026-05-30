@@ -29,7 +29,7 @@ const Logger = Layer.unwrap(
     const { HoneycombApiKey, RailwayEnvironmentName, RailwayServiceName } = yield* ServerEnv;
 
     return OtlpLogger.layer({
-      url: "https://api.honeycomb.io",
+      url: "https://api.honeycomb.io/v1/logs",
       headers: {
         "x-honeycomb-team": Redacted.value(HoneycombApiKey),
       },
