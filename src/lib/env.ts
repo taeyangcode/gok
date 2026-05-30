@@ -1,5 +1,5 @@
 import { NodeFileSystem } from "@effect/platform-node";
-import { Config, Context, Effect, Layer, Schema } from "effect";
+import { Config, Context, Effect, Layer, Match, Schema } from "effect";
 import { ConfigProvider } from "effect";
 import { Redacted } from "effect";
 
@@ -47,10 +47,16 @@ export class ServerEnv extends Context.Service<
   );
 }
 
-export const EnvironmentLive = ConfigProvider.layerAdd(
+export const LocalServerEnv = ConfigProvider.layerAdd(
   ConfigProvider.fromDotEnv({
     path: ".env.local",
     expandVariables: true,
   }),
   { asPrimary: true },
 ).pipe(Layer.orDie, Layer.provide(NodeFileSystem.layer));
+
+export const ServerEnvLive = Match.value(process.env.RAILWAY_ENVIRONMENT_NAME).pipe(
+  Match.when("production", () => ServerEnv.layer),
+  Match.when("development", () => ServerEnv.layer.pipe(Layer.provide(LocalServerEnv))),
+  Match.orElseAbsurd,
+);
