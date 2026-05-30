@@ -11,6 +11,10 @@ export class ServerEnv extends Context.Service<
 
     DatabaseUrl: Redacted.Redacted<string>;
 
+    GoogleApiKey: Redacted.Redacted<string>;
+    GoogleClientId: Redacted.Redacted<string>;
+    GoogleClientSecret: Redacted.Redacted<string>;
+
     PgPort: Redacted.Redacted<number>;
   }
 >()("@gok/env/ServerEnv") {
@@ -19,6 +23,10 @@ export class ServerEnv extends Context.Service<
     Effect.gen(function* () {
       const BetterAuthUrl = yield* Config.redacted("BETTER_AUTH_URL").pipe(Effect.orDie);
       const BetterAuthSecret = yield* Config.redacted("BETTER_AUTH_SECRET").pipe(Effect.orDie);
+
+      const GoogleApiKey = yield* Config.redacted("GOOGLE_API_KEY").pipe(Effect.orDie);
+      const GoogleClientId = yield* Config.redacted("GOOGLE_CLIENT_ID").pipe(Effect.orDie);
+      const GoogleClientSecret = yield* Config.redacted("GOOGLE_CLIENT_SECRET").pipe(Effect.orDie);
 
       const DatabaseUrl = yield* Config.redacted("DATABASE_URL").pipe(Effect.orDie);
 
@@ -30,6 +38,9 @@ export class ServerEnv extends Context.Service<
         BetterAuthUrl,
         BetterAuthSecret,
         DatabaseUrl,
+        GoogleApiKey,
+        GoogleClientId,
+        GoogleClientSecret,
         PgPort,
       };
     }),

@@ -10,6 +10,19 @@ export const user = pgTable("user", {
   updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true }).notNull(),
 });
 
+export const session = pgTable("session", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at", { precision: 6, withTimezone: true }).notNull(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at", { precision: 6, withTimezone: true }).notNull(),
+  updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true }).notNull(),
+});
+
 export const account = pgTable("account", {
   id: text("id").primaryKey(),
   userId: text("user_id")
