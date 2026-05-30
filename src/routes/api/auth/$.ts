@@ -12,26 +12,27 @@ export const Route = createFileRoute("/api/auth/$")({
           Effect.gen(function* () {
             yield* Effect.annotateCurrentSpan({
               "http.method": request.method,
-              "url.path": new URL(request.url).pathname,
+              "url.path": request.url,
             });
 
             const auth = yield* ServerAuth;
-            return yield* Effect.tryPromise({
-              try: () => auth.handler(request),
-              catch: (error) => Effect.annotateCurrentSpan({ error: error }),
-            });
+            return yield* Effect.tryPromise(() => auth.handler(request)).pipe(
+              Effect.tapError((error) => Effect.annotateCurrentSpan({ error: error.toJSON() })),
+            );
           }).pipe(Effect.withSpan("@gok/api/auth/GET")),
         ),
       POST: ({ request }) =>
         Runtime.runPromise(
           Effect.gen(function* () {
-            yield* Effect.annotateCurrentSpan({ request: request });
+            yield* Effect.annotateCurrentSpan({
+              "http.method": request.method,
+              "url.path": request.url,
+            });
 
             const auth = yield* ServerAuth;
-            return yield* Effect.tryPromise({
-              try: () => auth.handler(request),
-              catch: (error) => Effect.annotateCurrentSpan({ error: error }),
-            });
+            return yield* Effect.tryPromise(() => auth.handler(request)).pipe(
+              Effect.tapError((error) => Effect.annotateCurrentSpan({ error: error.toJSON() })),
+            );
           }).pipe(Effect.withSpan("@gok/api/auth/POST")),
         ),
     },
