@@ -22,8 +22,10 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@better-auth/drizzle-adapter": "^1.6.12",
     "@effect/platform-node": "4.0.0-beta.74",
     "@effect/sql-pg": "4.0.0-beta.74",
+    "@googleapis/youtube": "^33.0.0",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-devtools": "latest",
     "@tanstack/react-router": "latest",
