@@ -10,16 +10,26 @@ export const Route = createFileRoute("/api/auth/$")({
       GET: ({ request }) =>
         Runtime.runPromise(
           Effect.gen(function* () {
+            yield* Effect.annotateCurrentSpan({ request: request });
+
             const auth = yield* ServerAuth;
-            return yield* Effect.tryPromise(() => auth.handler(request));
-          }),
+            return yield* Effect.tryPromise({
+              try: () => auth.handler(request),
+              catch: (error) => Effect.annotateCurrentSpan({ error: error }),
+            });
+          }).pipe(Effect.withSpan("@gok/api/auth/GET")),
         ),
       POST: ({ request }) =>
         Runtime.runPromise(
           Effect.gen(function* () {
+            yield* Effect.annotateCurrentSpan({ request: request });
+
             const auth = yield* ServerAuth;
-            return yield* Effect.tryPromise(() => auth.handler(request));
-          }),
+            return yield* Effect.tryPromise({
+              try: () => auth.handler(request),
+              catch: (error) => Effect.annotateCurrentSpan({ error: error }),
+            });
+          }).pipe(Effect.withSpan("@gok/api/auth/POST")),
         ),
     },
   },
