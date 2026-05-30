@@ -10,7 +10,10 @@ export const Route = createFileRoute("/api/auth/$")({
       GET: ({ request }) =>
         Runtime.runPromise(
           Effect.gen(function* () {
-            yield* Effect.annotateCurrentSpan({ request: request });
+            yield* Effect.annotateCurrentSpan({
+              "http.method": request.method,
+              "url.path": new URL(request.url).pathname,
+            });
 
             const auth = yield* ServerAuth;
             return yield* Effect.tryPromise({
