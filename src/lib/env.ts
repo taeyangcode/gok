@@ -9,6 +9,11 @@ export class ServerEnv extends Context.Service<
     BetterAuthUrl: Redacted.Redacted<string>;
     BetterAuthSecret: Redacted.Redacted<string>;
 
+    CloudflareAccessKeyId: Redacted.Redacted<string>;
+    CloudflareAccountId: Redacted.Redacted<string>;
+    CloudflareApiToken: Redacted.Redacted<string>;
+    CloudflareSecretAccessKey: Redacted.Redacted<string>;
+
     DatabaseUrl: Redacted.Redacted<string>;
 
     GoogleApiKey: Redacted.Redacted<string>;
@@ -28,6 +33,17 @@ export class ServerEnv extends Context.Service<
     Effect.gen(function* () {
       const BetterAuthUrl = yield* Config.redacted("BETTER_AUTH_URL").pipe(Effect.orDie);
       const BetterAuthSecret = yield* Config.redacted("BETTER_AUTH_SECRET").pipe(Effect.orDie);
+
+      const CloudflareAccessKeyId = yield* Config.redacted("CLOUDFLARE_ACCESS_KEY_ID").pipe(
+        Effect.orDie,
+      );
+      const CloudflareAccountId = yield* Config.redacted("CLOUDFLARE_ACCOUNT_ID").pipe(
+        Effect.orDie,
+      );
+      const CloudflareApiToken = yield* Config.redacted("CLOUDFLARE_API_TOKEN").pipe(Effect.orDie);
+      const CloudflareSecretAccessKey = yield* Config.redacted("CLOUDFLARE_SECRET_ACCESS_KEY").pipe(
+        Effect.orDie,
+      );
 
       const DatabaseUrl = yield* Config.redacted("DATABASE_URL").pipe(Effect.orDie);
 
@@ -49,12 +65,22 @@ export class ServerEnv extends Context.Service<
       return {
         BetterAuthUrl,
         BetterAuthSecret,
+
+        CloudflareAccessKeyId,
+        CloudflareAccountId,
+        CloudflareApiToken,
+        CloudflareSecretAccessKey,
+
         DatabaseUrl,
+
         GoogleApiKey,
         GoogleClientId,
         GoogleClientSecret,
+
         HoneycombApiKey,
+
         PgPort,
+
         RailwayEnvironmentName,
         RailwayServiceName,
       };
