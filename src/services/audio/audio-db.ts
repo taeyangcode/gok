@@ -17,25 +17,25 @@ type AudioDbService = {
     fileSizeBytes: number,
     mimeType: string,
   ) => Effect.Effect<AudioSelect, AudioDbMissing>;
-  readonly markFailed: (id: AudioId) => Effect.Effect<AudioSelect, AudioDbMissing>;
+  readonly delete: (id: AudioId) => Effect.Effect<void, AudioDbMissing>;
 };
 
 export class AudioDb extends Context.Service<AudioDb, AudioDbService>()(
   "@gok/services/audio-db/AudioDb",
 ) {}
 
-export class AudioDbMissing extends Schema.ErrorClass<AudioDbMissing>(
+export class AudioDbMissing extends Schema.TaggedErrorClass<AudioDbMissing>(
   "@gok/services/audio/audio-db/AudioDbMissing",
-)({}) {}
+)("AudioDbMissing", {}) {}
 
-export class AudioDbLocked extends Schema.ErrorClass<AudioDbLocked>(
+export class AudioDbLocked extends Schema.TaggedErrorClass<AudioDbLocked>(
   "@gok/services/audio/audio-db/AudioDbLocked",
-)({
+)("AudioDbLocked", {
   audio: AudioSelect,
 }) {}
 
-export class AudioDbReady extends Schema.ErrorClass<AudioDbReady>(
+export class AudioDbReady extends Schema.TaggedErrorClass<AudioDbReady>(
   "@gok/services/audio/audio-db/AudioDbReady",
-)({
+)("AudioDbReady", {
   audio: AudioSelect,
 }) {}

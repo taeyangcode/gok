@@ -28,6 +28,6 @@ export const YoutubeAudioResult = AudioSelect.mapFields(
 );
 export type YoutubeAudioResult = typeof YoutubeAudioResult.Type;
 
-export class YoutubeAudioDoesNotExist extends Schema.ErrorClass<YoutubeAudioDoesNotExist>(
+export class YoutubeAudioDoesNotExist extends Schema.TaggedErrorClass<YoutubeAudioDoesNotExist>(
   "@gok/services/audio/youtube-audio/YoutubeAudioDoesNotExist",
-)({}) {}
+)("YoutubeAudioDoesNotExist", {}) {}

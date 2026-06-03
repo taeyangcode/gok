@@ -53,6 +53,6 @@ export class R2ObjectUploadResponse extends Schema.Class<R2ObjectUploadResponse>
 export const AudioSignedUrl = Schema.brand("AudioSignedUrl")(Schema.String);
 export type AudioSignedUrl = typeof AudioSignedUrl.Type;
 
-export class AudioObjectMissing extends Schema.ErrorClass<AudioObjectMissing>(
+export class AudioObjectMissing extends Schema.TaggedErrorClass<AudioObjectMissing>(
   "@gok/services/audio/audio-storage/AudioObjectMissing",
-)({}) {}
+)("AudioObjectMissing", {}) {}
