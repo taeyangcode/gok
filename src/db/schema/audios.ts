@@ -41,7 +41,7 @@ export type AudioSourceId = typeof AudioSourceId.Type;
 export const AudioStorageKey = Schema.brand("AudioStorageKey")(Schema.String);
 export type AudioStorageKey = typeof AudioStorageKey.Type;
 
-export const AudioDownloadStatus = Schema.Literals([""]);
+export const AudioDownloadStatus = Schema.Literals(["registered", "downloading", "ready"]);
 export type AudioDownloadStatus = typeof AudioDownloadStatus.Type;
 
 export const AudioInsert = createInsertSchema(audios, {

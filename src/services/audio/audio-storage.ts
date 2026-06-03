@@ -1,14 +1,14 @@
 import { Context, Effect, Schema } from "effect";
 
-import { AudioStorageKey } from "#/db/schema/audios";
+import { AudioId, AudioStorageKey } from "#/db/schema/audios";
 
 type AudioStorageService = {
-  readonly find: (id: AudioStorageKey) => Effect.Effect<R2ObjectListResponse | AudioObjectMissing>;
-  readonly upload: (
-    id: AudioStorageKey,
-    path: string,
-  ) => Effect.Effect<R2ObjectUploadResponse | AudioObjectMissing>;
-  readonly signedUrl: (id: AudioStorageKey) => Effect.Effect<AudioSignedUrl | AudioObjectMissing>;
+  readonly find: (
+    storageId: AudioStorageKey,
+  ) => Effect.Effect<R2ObjectListResponse, AudioObjectMissing>;
+  readonly createStorageKey: (audioId: AudioId) => Effect.Effect<AudioStorageKey>;
+  readonly upload: (id: AudioStorageKey, file: File) => Effect.Effect<R2ObjectUploadResponse>;
+  readonly signedUrl: (id: AudioStorageKey) => Effect.Effect<AudioSignedUrl, AudioObjectMissing>;
 };
 
 export class AudioStorage extends Context.Service<AudioStorage, AudioStorageService>()(
