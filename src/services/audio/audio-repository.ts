@@ -7,9 +7,9 @@ import { AudioDb, AudioDbLocked, AudioDbMissing, AudioDbReady } from "#/services
 import {
   AudioObjectMissing,
   AudioStorage,
-  R2ObjectUploadResponse,
+  ObjectUploadResponse,
 } from "#/services/audio/audio-storage";
-import { YoutubeAudio, YoutubeAudioDoesNotExist } from "#/services/audio/youtube-audio";
+import { AudioOnlyError, CouldNotFindAudio, YoutubeAudio } from "#/services/audio/youtube-audio";
 
 type AudioRepositoryService = {
   readonly ensureDownloaded: (sourceId: AudioSourceId) => Effect.Effect<unknown>;
@@ -22,12 +22,13 @@ export class AudioRepository extends Context.Service<AudioRepository, AudioRepos
 const EnsureAudioDownloadedWorkflow = Workflow.make({
   name: "EnsureAudioDownloaded",
   error: Schema.Union([
+    AudioOnlyError,
     AudioDbLocked,
     AudioDbMissing,
     AudioDbReady,
     AudioObjectMissing,
+    CouldNotFindAudio,
     EffectDrizzleQueryError,
-    YoutubeAudioDoesNotExist,
   ]),
   success: Schema.Void,
   payload: Schema.Struct({
@@ -44,7 +45,7 @@ const EnsureAudioDownloaded = EnsureAudioDownloadedWorkflow.toLayer(
 
     const audioRecord = yield* Activity.make({
       name: "GetOrRegisterAudioToDb",
-      error: Schema.Union([EffectDrizzleQueryError, YoutubeAudioDoesNotExist]),
+      error: Schema.Union([EffectDrizzleQueryError, AudioOnlyError, CouldNotFindAudio]),
       success: AudioSelect,
       execute: Effect.gen(function* () {
         const audioRecord = yield* audioDb.findBySourceId(payload.sourceId);
@@ -62,7 +63,8 @@ const EnsureAudioDownloaded = EnsureAudioDownloadedWorkflow.toLayer(
       }),
     }).pipe(
       Effect.catchTags({
-        YoutubeAudioDoesNotExist: (audioDoesNotExist) => Effect.fail(audioDoesNotExist),
+        AudioOnlyError: (audioOnlyError) => Effect.fail(audioOnlyError),
+        CouldNotFindAudio: (couldNotFindAudio) => Effect.fail(couldNotFindAudio),
       }),
     );
 
@@ -88,7 +90,7 @@ const EnsureAudioDownloaded = EnsureAudioDownloadedWorkflow.toLayer(
     yield* Effect.gen(function* () {
       const audioFile = yield* Activity.make({
         name: "DownloadAudio",
-        error: YoutubeAudioDoesNotExist,
+        error: Schema.Union([AudioOnlyError, CouldNotFindAudio]),
         success: Schema.File,
         execute: Effect.gen(function* () {
           return yield* youtube.download(payload.sourceId);
@@ -100,7 +102,7 @@ const EnsureAudioDownloaded = EnsureAudioDownloadedWorkflow.toLayer(
       yield* Activity.make({
         name: "UploadAudioToStorage",
         error: Schema.Never,
-        success: R2ObjectUploadResponse,
+        success: ObjectUploadResponse,
         execute: Effect.gen(function* () {
           return yield* audioStorage.upload(audioStorageKey, audioFile);
         }),
@@ -108,7 +110,7 @@ const EnsureAudioDownloaded = EnsureAudioDownloadedWorkflow.toLayer(
 
       yield* Activity.make({
         name: "MarkAudioReady",
-        error: AudioDbMissing,
+        error: Schema.Union([AudioDbMissing, EffectDrizzleQueryError]),
         success: Schema.Void,
         execute: Effect.gen(function* () {
           return yield* audioDb.markReady(
