@@ -1,53 +1,110 @@
-import { Context, Effect, Schema } from "effect";
+import { GetObjectCommand, HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { Context, Effect, Layer, Redacted, Schema } from "effect";
 
 import { AudioId, AudioStorageKey } from "#/db/schema/audios";
+import { ServerEnv } from "#/lib/env";
+import { R2Client } from "#/lib/r2";
 
 type AudioStorageService = {
-  readonly find: (
-    storageId: AudioStorageKey,
-  ) => Effect.Effect<R2ObjectListResponse, AudioObjectMissing>;
+  readonly find: (storageKey: AudioStorageKey) => Effect.Effect<ObjectHeadResponse, unknown>;
   readonly createStorageKey: (audioId: AudioId) => Effect.Effect<AudioStorageKey>;
-  readonly upload: (id: AudioStorageKey, file: File) => Effect.Effect<R2ObjectUploadResponse>;
-  readonly signedUrl: (id: AudioStorageKey) => Effect.Effect<AudioSignedUrl, AudioObjectMissing>;
+  readonly upload: (
+    storageKey: AudioStorageKey,
+    file: File,
+  ) => Effect.Effect<ObjectUploadResponse, unknown>;
+  readonly createSignedUrl: (storageKey: AudioStorageKey) => Effect.Effect<AudioSignedUrl, unknown>;
 };
 
 export class AudioStorage extends Context.Service<AudioStorage, AudioStorageService>()(
   "@gok/services/audio/audio-storage/AudioStorage",
-) {}
+) {
+  static readonly layer = Layer.effect(
+    this,
+    Effect.gen(function* () {
+      const storageClient = yield* R2Client;
+      const { CloudflareR2AudioBucketName } = yield* ServerEnv;
+      const bucket = Redacted.value(CloudflareR2AudioBucketName);
 
-// https://developers.cloudflare.com/api/resources/r2#(resource)%20r2.buckets.objects%20%3E%20(model)%20object_list_response%20%3E%20(schema)
-export class R2ObjectListResponse extends Schema.Class<R2ObjectListResponse>(
-  "@gok/services/audio/audio-storage/R2ObjectListResponse",
-)({
-  customMetadata: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
-  etag: Schema.optionalKey(Schema.String),
-  httpMetadata: Schema.optionalKey(
-    Schema.Struct({
-      cacheControl: Schema.optionalKey(Schema.String),
-      cacheExpiry: Schema.optionalKey(Schema.String),
-      contentDisposition: Schema.optionalKey(Schema.String),
-      contentEncoding: Schema.optionalKey(Schema.String),
-      contentLanguage: Schema.optionalKey(Schema.String),
-      contentType: Schema.optionalKey(Schema.String),
+      return {
+        find: Effect.fn(function* (storageKey) {
+          const audio = yield* Effect.tryPromise({
+            try: () =>
+              storageClient.send(
+                new HeadObjectCommand({
+                  Bucket: bucket,
+                  Key: storageKey,
+                }),
+              ),
+            catch: (_error) => {},
+          });
+
+          return ObjectHeadResponse.make({
+            key: storageKey,
+            etag: audio.ETag,
+            contentType: audio.ContentType,
+            contentLength: audio.ContentLength,
+            lastModified: audio.LastModified,
+          });
+        }),
+        createStorageKey: Effect.fn(function* (audioId) {
+          return yield* Effect.succeed(AudioStorageKey.make(`${bucket}/${audioId}`));
+        }),
+        upload: Effect.fn(function* (storageKey, file) {
+          const audio = yield* Effect.tryPromise(() =>
+            storageClient.send(
+              new PutObjectCommand({
+                Bucket: bucket,
+                Key: storageKey,
+                Body: file,
+                ContentType: file.type,
+                ContentLength: file.size,
+              }),
+            ),
+          );
+          return ObjectUploadResponse.make({
+            key: storageKey,
+            etag: audio.ETag,
+          });
+        }),
+        createSignedUrl: Effect.fn(function* (storageKey) {
+          const url = yield* Effect.tryPromise({
+            try: () =>
+              getSignedUrl(
+                storageClient,
+                new GetObjectCommand({
+                  Bucket: bucket,
+                  Key: storageKey,
+                }),
+                {
+                  expiresIn: 60 * 10,
+                },
+              ),
+            catch: (_error) => {},
+          });
+
+          return AudioSignedUrl.make(url);
+        }),
+      };
     }),
-  ),
-  key: Schema.optionalKey(AudioStorageKey),
-  lastModified: Schema.optionalKey(Schema.String),
-  size: Schema.optionalKey(Schema.Number),
-  ssec: Schema.optionalKey(Schema.Boolean),
-  storageClass: Schema.optionalKey(Schema.String),
+  );
+}
+
+export class ObjectHeadResponse extends Schema.Class<ObjectHeadResponse>(
+  "@gok/services/audio/audio-storage/ObjectHeadResponse",
+)({
+  key: AudioStorageKey,
+  etag: Schema.optionalKey(Schema.String),
+  contentType: Schema.optionalKey(Schema.String),
+  contentLength: Schema.optionalKey(Schema.Number),
+  lastModified: Schema.optionalKey(Schema.Date),
 }) {}
 
-// https://developers.cloudflare.com/api/resources/r2#(resource)%20r2.buckets.objects%20%3E%20(model)%20object_upload_response%20%3E%20(schema)
-export class R2ObjectUploadResponse extends Schema.Class<R2ObjectUploadResponse>(
-  "@gok/services/audio/audio-storage/R2ObjectUploadResponse",
+export class ObjectUploadResponse extends Schema.Class<ObjectUploadResponse>(
+  "@gok/services/audio/audio-storage/ObjectUploadResponse",
 )({
+  key: AudioStorageKey,
   etag: Schema.optionalKey(Schema.String),
-  key: Schema.optionalKey(AudioStorageKey),
-  size: Schema.optionalKey(Schema.Number),
-  storageClass: Schema.optionalKey(Schema.String),
-  uploaded: Schema.optionalKey(Schema.String),
-  version: Schema.optionalKey(Schema.String),
 }) {}
 
 export const AudioSignedUrl = Schema.brand("AudioSignedUrl")(Schema.String);

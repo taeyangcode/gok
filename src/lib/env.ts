@@ -12,6 +12,7 @@ export class ServerEnv extends Context.Service<
     CloudflareAccessKeyId: Redacted.Redacted<string>;
     CloudflareAccountId: Redacted.Redacted<string>;
     CloudflareApiToken: Redacted.Redacted<string>;
+    CloudflareR2AudioBucketName: Redacted.Redacted<string>;
     CloudflareSecretAccessKey: Redacted.Redacted<string>;
 
     DatabaseUrl: Redacted.Redacted<string>;
@@ -41,6 +42,9 @@ export class ServerEnv extends Context.Service<
         Effect.orDie,
       );
       const CloudflareApiToken = yield* Config.redacted("CLOUDFLARE_API_TOKEN").pipe(Effect.orDie);
+      const CloudflareR2AudioBucketName = yield* Config.redacted(
+        "CLOUDFLARE_R2_AUDIO_BUCKET_NAME",
+      ).pipe(Effect.orDie);
       const CloudflareSecretAccessKey = yield* Config.redacted("CLOUDFLARE_SECRET_ACCESS_KEY").pipe(
         Effect.orDie,
       );
@@ -69,6 +73,7 @@ export class ServerEnv extends Context.Service<
         CloudflareAccessKeyId,
         CloudflareAccountId,
         CloudflareApiToken,
+        CloudflareR2AudioBucketName,
         CloudflareSecretAccessKey,
 
         DatabaseUrl,
