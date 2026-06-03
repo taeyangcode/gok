@@ -1,7 +1,8 @@
+import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import { Cause, Context, Effect, Option, Schema } from "effect";
 import { Activity, Workflow } from "effect/unstable/workflow";
 
-import { AudioSelect, AudioSourceId } from "#/db/schema/audios";
+import { AudioId, AudioSelect, AudioSourceId } from "#/db/schema/audios";
 import { AudioDb, AudioDbLocked, AudioDbMissing, AudioDbReady } from "#/services/audio/audio-db";
 import {
   AudioObjectMissing,
@@ -25,6 +26,7 @@ const EnsureAudioDownloadedWorkflow = Workflow.make({
     AudioDbMissing,
     AudioDbReady,
     AudioObjectMissing,
+    EffectDrizzleQueryError,
     YoutubeAudioDoesNotExist,
   ]),
   success: Schema.Void,
@@ -42,7 +44,7 @@ const EnsureAudioDownloaded = EnsureAudioDownloadedWorkflow.toLayer(
 
     const audioRecord = yield* Activity.make({
       name: "GetOrRegisterAudioToDb",
-      error: YoutubeAudioDoesNotExist,
+      error: Schema.Union([EffectDrizzleQueryError, YoutubeAudioDoesNotExist]),
       success: AudioSelect,
       execute: Effect.gen(function* () {
         const audioRecord = yield* audioDb.findBySourceId(payload.sourceId);
@@ -52,7 +54,11 @@ const EnsureAudioDownloaded = EnsureAudioDownloadedWorkflow.toLayer(
         }
 
         const audioInfo = yield* youtube.findInfo(payload.sourceId);
-        return yield* audioDb.register(audioInfo);
+        return yield* audioDb.ensureRegistered({
+          id: AudioId.make(crypto.randomUUID()),
+          downloadStatus: "registered",
+          ...audioInfo,
+        });
       }),
     }).pipe(
       Effect.catchTags({
@@ -62,7 +68,7 @@ const EnsureAudioDownloaded = EnsureAudioDownloadedWorkflow.toLayer(
 
     const claimedAudio = yield* Activity.make({
       name: "ClaimAudioDownload",
-      error: Schema.Union([AudioDbLocked, AudioDbMissing, AudioDbReady]),
+      error: Schema.Union([AudioDbLocked, AudioDbMissing, AudioDbReady, EffectDrizzleQueryError]),
       success: AudioSelect,
       execute: Effect.gen(function* () {
         return yield* audioDb.claimDownload(audioRecord.id);

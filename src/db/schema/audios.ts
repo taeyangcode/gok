@@ -48,7 +48,7 @@ export const AudioInsert = createInsertSchema(audios, {
   id: AudioId,
   sourceId: AudioSourceId,
   downloadStatus: AudioDownloadStatus,
-  storageKey: AudioStorageKey,
+  storageKey: Schema.optionalKey(AudioStorageKey),
 });
 export type AudioInsert = typeof AudioInsert.Type;
 
@@ -56,7 +56,7 @@ export const AudioUpdate = createUpdateSchema(audios, {
   id: AudioId,
   sourceId: AudioSourceId,
   downloadStatus: AudioDownloadStatus,
-  storageKey: AudioStorageKey,
+  storageKey: Schema.optionalKey(AudioStorageKey),
 });
 export type AudioUpdate = typeof AudioUpdate.Type;
 
@@ -64,6 +64,6 @@ export const AudioSelect = createSelectSchema(audios, {
   id: AudioId,
   sourceId: AudioSourceId,
   downloadStatus: AudioDownloadStatus,
-  storageKey: AudioStorageKey,
+  storageKey: Schema.optionalKey(AudioStorageKey),
 });
 export type AudioSelect = typeof AudioSelect.Type;
