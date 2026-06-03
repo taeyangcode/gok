@@ -5,7 +5,7 @@ export class YtdlpClient extends Context.Service<YtdlpClient, YtDlp>()("@gok/ytd
   static readonly layer = Layer.effect(
     this,
     Effect.gen(function* () {
-      const client = new YtDlp();
+      const client = new YtDlp({ binaryPath: "./ytdlp" });
       const ffmpegInstalled = client.checkInstallation();
       if (!ffmpegInstalled) {
         yield* Effect.promise(() => client.downloadFFmpeg());

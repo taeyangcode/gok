@@ -7,13 +7,10 @@ import { ServerEnv } from "#/lib/env";
 import { R2Client } from "#/lib/r2";
 
 type AudioStorageService = {
-  readonly find: (storageKey: AudioStorageKey) => Effect.Effect<ObjectHeadResponse, unknown>;
+  readonly find: (storageKey: AudioStorageKey) => Effect.Effect<ObjectHeadResponse>;
   readonly createStorageKey: (audioId: AudioId) => Effect.Effect<AudioStorageKey>;
-  readonly upload: (
-    storageKey: AudioStorageKey,
-    file: File,
-  ) => Effect.Effect<ObjectUploadResponse, unknown>;
-  readonly createSignedUrl: (storageKey: AudioStorageKey) => Effect.Effect<AudioSignedUrl, unknown>;
+  readonly upload: (storageKey: AudioStorageKey, file: File) => Effect.Effect<ObjectUploadResponse>;
+  readonly createSignedUrl: (storageKey: AudioStorageKey) => Effect.Effect<AudioSignedUrl>;
 };
 
 export class AudioStorage extends Context.Service<AudioStorage, AudioStorageService>()(
@@ -28,16 +25,14 @@ export class AudioStorage extends Context.Service<AudioStorage, AudioStorageServ
 
       return {
         find: Effect.fn(function* (storageKey) {
-          const audio = yield* Effect.tryPromise({
-            try: () =>
-              storageClient.send(
-                new HeadObjectCommand({
-                  Bucket: bucket,
-                  Key: storageKey,
-                }),
-              ),
-            catch: (_error) => {},
-          });
+          const audio = yield* Effect.tryPromise(() =>
+            storageClient.send(
+              new HeadObjectCommand({
+                Bucket: bucket,
+                Key: storageKey,
+              }),
+            ),
+          ).pipe(Effect.orDie);
 
           return ObjectHeadResponse.make({
             key: storageKey,
@@ -48,40 +43,42 @@ export class AudioStorage extends Context.Service<AudioStorage, AudioStorageServ
           });
         }),
         createStorageKey: Effect.fn(function* (audioId) {
-          return yield* Effect.succeed(AudioStorageKey.make(`${bucket}/${audioId}`));
+          return yield* Effect.succeed(AudioStorageKey.make(`audio/${audioId}`));
         }),
         upload: Effect.fn(function* (storageKey, file) {
+          const buffer = yield* Effect.promise(() => file.arrayBuffer());
+          const body = new Uint8Array(buffer);
+
           const audio = yield* Effect.tryPromise(() =>
             storageClient.send(
               new PutObjectCommand({
                 Bucket: bucket,
                 Key: storageKey,
-                Body: file,
+                Body: body,
                 ContentType: file.type,
                 ContentLength: file.size,
               }),
             ),
-          );
+          ).pipe(Effect.orDie);
+
           return ObjectUploadResponse.make({
             key: storageKey,
             etag: audio.ETag,
           });
         }),
         createSignedUrl: Effect.fn(function* (storageKey) {
-          const url = yield* Effect.tryPromise({
-            try: () =>
-              getSignedUrl(
-                storageClient,
-                new GetObjectCommand({
-                  Bucket: bucket,
-                  Key: storageKey,
-                }),
-                {
-                  expiresIn: 60 * 10,
-                },
-              ),
-            catch: (_error) => {},
-          });
+          const url = yield* Effect.tryPromise(() =>
+            getSignedUrl(
+              storageClient,
+              new GetObjectCommand({
+                Bucket: bucket,
+                Key: storageKey,
+              }),
+              {
+                expiresIn: 60 * 10,
+              },
+            ),
+          ).pipe(Effect.orDie);
 
           return AudioSignedUrl.make(url);
         }),
