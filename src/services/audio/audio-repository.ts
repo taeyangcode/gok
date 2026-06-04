@@ -1,5 +1,6 @@
+import { NodeFileSystem } from "@effect/platform-node";
 import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
-import { Cause, Context, Effect, Layer, Option, Schema } from "effect";
+import { Cause, Context, Effect, FileSystem, Layer, Option, Schema } from "effect";
 import { Activity, Workflow } from "effect/unstable/workflow";
 
 import { AudioId, AudioSelect, AudioSourceId } from "#/db/schema/audios";
@@ -11,9 +12,15 @@ import { AudioDb, AudioDbLocked, AudioDbMissing, AudioDbReady } from "#/services
 import {
   AudioObjectMissing,
   AudioStorage,
+  AudioUploadError,
   ObjectUploadResponse,
 } from "#/services/audio/audio-storage";
-import { AudioOnlyError, CouldNotFindAudio, YoutubeAudio } from "#/services/audio/youtube-audio";
+import {
+  AudioOnlyError,
+  CouldNotFindAudio,
+  DownloadedAudioFile,
+  YoutubeAudio,
+} from "#/services/audio/youtube-audio";
 
 type AudioRepositoryService = {
   readonly ensureDownloaded: (
@@ -60,6 +67,7 @@ const EnsureAudioDownloadedWorkflow = Workflow.make({
     AudioDbMissing,
     AudioDbReady,
     AudioObjectMissing,
+    AudioUploadError,
     CouldNotFindAudio,
     EffectDrizzleQueryError,
   ]),
@@ -124,7 +132,7 @@ const EnsureAudioDownloaded = EnsureAudioDownloadedWorkflow.toLayer(
       const audioFile = yield* Activity.make({
         name: "DownloadAudio",
         error: Schema.Union([AudioOnlyError, CouldNotFindAudio]),
-        success: Schema.File,
+        success: DownloadedAudioFile,
         execute: Effect.gen(function* () {
           return yield* youtube.download(payload.sourceId);
         }),
@@ -132,25 +140,25 @@ const EnsureAudioDownloaded = EnsureAudioDownloadedWorkflow.toLayer(
 
       const audioStorageKey = yield* audioStorage.createStorageKey(claimedAudio.id);
 
-      yield* Activity.make({
+      const upload = yield* Activity.make({
         name: "UploadAudioToStorage",
-        error: Schema.Never,
+        error: AudioUploadError,
         success: ObjectUploadResponse,
         execute: Effect.gen(function* () {
-          return yield* audioStorage.upload(audioStorageKey, audioFile);
+          return yield* audioStorage.upload(audioStorageKey, audioFile.path);
         }),
       });
 
       yield* Activity.make({
         name: "MarkAudioReady",
         error: Schema.Union([AudioDbMissing, EffectDrizzleQueryError]),
-        success: Schema.Void,
+        success: AudioSelect,
         execute: Effect.gen(function* () {
           return yield* audioDb.markReady(
             claimedAudio.id,
             audioStorageKey,
-            audioFile.size,
-            audioFile.type,
+            audioFile.contentType,
+            upload.contentLength,
           );
         }),
       });
@@ -170,5 +178,6 @@ const EnsureAudioDownloaded = EnsureAudioDownloadedWorkflow.toLayer(
 ).pipe(
   Layer.provide([AudioDb.layer, YoutubeAudio.layer, AudioStorage.layer]),
   Layer.provide([YtdlpClient.layer, R2Client.layer]),
+  Layer.provide(NodeFileSystem.layer),
   Layer.provide(ServerEnvLive),
 );

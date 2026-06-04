@@ -1,7 +1,7 @@
 import { Context, Effect, Layer } from "effect";
 import { YtDlp } from "ytdlp-nodejs";
 
-export class YtdlpClient extends Context.Service<YtdlpClient, YtDlp>()("@gok/ytdlp/Ytdlp") {
+export class YtdlpClient extends Context.Service<YtdlpClient, YtDlp>()("@gok/lib/ytdlp/Ytdlp") {
   static readonly layer = Layer.effect(
     this,
     Effect.gen(function* () {

@@ -30,8 +30,8 @@ type AudioDbService = {
   readonly markReady: (
     audioId: AudioId,
     storageKey: AudioStorageKey,
-    fileSizeBytes: number,
-    mimeType: string,
+    contentType: string,
+    contentLength: number,
   ) => Effect.Effect<AudioSelect, AudioDbMissing | EffectDrizzleQueryError>;
   readonly delete: (id: AudioId) => Effect.Effect<void, AudioDbMissing | EffectDrizzleQueryError>;
 };
@@ -81,7 +81,7 @@ export class AudioDb extends Context.Service<AudioDb, AudioDbService>()(
             .returning();
           return Schema.decodeUnknownSync(AudioSelect)(record);
         }),
-        markReady: Effect.fn(function* (id, storageKey, fileSizeBytes, mimeType) {
+        markReady: Effect.fn(function* (id, storageKey, mimeType, fileSizeBytes) {
           const [record] = yield* db
             .update(audios)
             .set({ downloadStatus: "ready", storageKey, fileSizeBytes, mimeType })

@@ -1,6 +1,8 @@
+import { createReadStream } from "node:fs";
+
 import { GetObjectCommand, HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { Context, Effect, Layer, Redacted, Schema } from "effect";
+import { Context, Effect, FileSystem, Layer, Redacted, Schema } from "effect";
 
 import { AudioId, AudioStorageKey } from "#/db/schema/audios";
 import { ServerEnv } from "#/lib/env";
@@ -9,7 +11,10 @@ import { R2Client } from "#/lib/r2";
 type AudioStorageService = {
   readonly find: (storageKey: AudioStorageKey) => Effect.Effect<ObjectHeadResponse>;
   readonly createStorageKey: (audioId: AudioId) => Effect.Effect<AudioStorageKey>;
-  readonly upload: (storageKey: AudioStorageKey, file: File) => Effect.Effect<ObjectUploadResponse>;
+  readonly upload: (
+    storageKey: AudioStorageKey,
+    filePath: string,
+  ) => Effect.Effect<ObjectUploadResponse, AudioUploadError>;
   readonly createSignedUrl: (storageKey: AudioStorageKey) => Effect.Effect<AudioSignedUrl>;
 };
 
@@ -20,8 +25,10 @@ export class AudioStorage extends Context.Service<AudioStorage, AudioStorageServ
     this,
     Effect.gen(function* () {
       const storageClient = yield* R2Client;
+      const fs = yield* FileSystem.FileSystem;
       const { CloudflareR2AudioBucketName } = yield* ServerEnv;
       const bucket = Redacted.value(CloudflareR2AudioBucketName);
+      yield* Effect.log({ bucket });
 
       return {
         find: Effect.fn(function* (storageKey) {
@@ -45,25 +52,30 @@ export class AudioStorage extends Context.Service<AudioStorage, AudioStorageServ
         createStorageKey: Effect.fn(function* (audioId) {
           return yield* Effect.succeed(AudioStorageKey.make(`audio/${audioId}`));
         }),
-        upload: Effect.fn(function* (storageKey, file) {
-          const buffer = yield* Effect.promise(() => file.arrayBuffer());
-          const body = new Uint8Array(buffer);
+        upload: Effect.fn(function* (storageKey, filePath) {
+          const info = yield* fs
+            .stat(filePath)
+            .pipe(Effect.mapError((error) => AudioUploadError.make({ error: error.message })));
 
-          const audio = yield* Effect.tryPromise(() =>
-            storageClient.send(
-              new PutObjectCommand({
-                Bucket: bucket,
-                Key: storageKey,
-                Body: body,
-                ContentType: file.type,
-                ContentLength: file.size,
-              }),
-            ),
-          ).pipe(Effect.orDie);
+          const audio = yield* Effect.tryPromise({
+            try: () =>
+              storageClient.send(
+                new PutObjectCommand({
+                  Bucket: bucket,
+                  Key: storageKey,
+                  Body: createReadStream(filePath),
+                  ContentType: info.type,
+                  ContentLength: Number(info.size),
+                }),
+              ),
+            catch: (error) => AudioUploadError.make({ error: error?.message ?? String(error) }),
+          });
 
           return ObjectUploadResponse.make({
             key: storageKey,
             etag: audio.ETag,
+            contentType: info.type,
+            contentLength: Number(info.size),
           });
         }),
         createSignedUrl: Effect.fn(function* (storageKey) {
@@ -102,6 +114,14 @@ export class ObjectUploadResponse extends Schema.Class<ObjectUploadResponse>(
 )({
   key: AudioStorageKey,
   etag: Schema.optionalKey(Schema.String),
+  contentType: Schema.String,
+  contentLength: Schema.Number,
+}) {}
+
+export class AudioUploadError extends Schema.TaggedErrorClass<AudioUploadError>(
+  "@gok/services/audio/audio-storage/AudioUploadError",
+)("AudioUploadError", {
+  error: Schema.optional(Schema.String),
 }) {}
 
 export const AudioSignedUrl = Schema.brand("AudioSignedUrl")(Schema.String);

@@ -11,6 +11,7 @@ export class R2Client extends Context.Service<R2Client, S3Client>()("@gok/r2/R2C
         yield* ServerEnv;
 
       const client = new S3Client({
+        region: "auto",
         endpoint: `https://${Redacted.value(CloudflareAccountId)}.r2.cloudflarestorage.com`,
         credentials: {
           accessKeyId: Redacted.value(CloudflareAccessKeyId),

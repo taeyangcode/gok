@@ -8,7 +8,7 @@ type YoutubeAudioService = {
   findInfo: (
     sourceId: AudioSourceId,
   ) => Effect.Effect<YoutubeAudioResult, AudioOnlyError | CouldNotFindAudio>;
-  download: (sourceId: AudioSourceId) => Effect.Effect<File, CouldNotFindAudio>;
+  download: (sourceId: AudioSourceId) => Effect.Effect<DownloadedAudioFile, CouldNotFindAudio>;
   // list: (query: string) => Effect.Effect<YoutubeAudioResult[]>;
 };
 
@@ -25,38 +25,39 @@ export class YoutubeAudio extends Context.Service<YoutubeAudio, YoutubeAudioServ
           const info = yield* Effect.tryPromise({
             try: () =>
               youtubeClient.getInfoAsync(youtubeUrlFromId(sourceId), { flatPlaylist: true }),
-            catch: (error) => new CouldNotFindAudio(),
+            catch: (error) => new CouldNotFindAudio({ error: error }),
           });
 
           if (info._type === "video") {
             return YoutubeAudioResult.make({
-              title: info.title,
-              artist: info.uploader,
-              durationSeconds: info.duration,
+              title: info.title ?? "Unknown title",
+              artist: info.uploader ?? null,
+              durationSeconds: info.duration ?? null,
 
               sourceType: "youtube",
               sourceId: sourceId,
-              sourceUrl: info.url,
-              thumbnailUrl: info.thumbnail,
+              sourceUrl: info.webpage_url ?? youtubeUrlFromId(sourceId),
+              thumbnailUrl: info.thumbnail ?? null,
             });
           }
 
           return yield* new AudioOnlyError();
         }),
         download: Effect.fn(function* (sourceId) {
-          const file = yield* Effect.tryPromise({
+          const result = yield* Effect.tryPromise({
             try: () =>
-              youtubeClient.getFileAsync(youtubeUrlFromId(sourceId), {
-                audioFormat: "mp3",
-                format: {
-                  filter: "audioonly",
-                  type: "mp3",
-                },
+              youtubeClient.downloadAudio(youtubeUrlFromId(sourceId), "mp3", {
+                noPlaylist: true,
+                output: `./tmp/audio/${sourceId}.%(ext)s`,
               }),
-            catch: (error) => new CouldNotFindAudio(),
+            catch: (error) => new CouldNotFindAudio({ error: error }),
           });
 
-          return file;
+          const [path] = result.filePaths;
+          if (path === undefined) {
+            return yield* new CouldNotFindAudio();
+          }
+          return DownloadedAudioFile.make({ path, contentType: "audio/mpeg" });
         }),
       };
     }),
@@ -77,9 +78,17 @@ export const YoutubeAudioResult = AudioSelect.mapFields(
 );
 export type YoutubeAudioResult = typeof YoutubeAudioResult.Type;
 
+export const DownloadedAudioFile = Schema.Struct({
+  path: Schema.String,
+  contentType: Schema.String,
+});
+export type DownloadedAudioFile = typeof DownloadedAudioFile.Type;
+
 export class CouldNotFindAudio extends Schema.TaggedErrorClass<CouldNotFindAudio>(
   "@gok/services/audio/youtube-audio/CouldNotFindAudio",
-)("CouldNotFindAudio", {}) {}
+)("CouldNotFindAudio", {
+  error: Schema.optional(Schema.Unknown),
+}) {}
 
 export class AudioOnlyError extends Schema.TaggedErrorClass<AudioOnlyError>(
   "@gok/services/audio/youtube-audio/AudioOnlyError",
